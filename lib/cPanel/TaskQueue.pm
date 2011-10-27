@@ -191,7 +191,7 @@ my $taskqueue_uuid = 'TaskQueue';
         if ( defined $args_ref->{serial} ) {
             _load_serializer_module( $args_ref->{serial} );
             $serializer = $args_ref->{serial};
-        }
+        } 
         $serializer ||= _get_serializer();
         # TODO: Do I want to sanity check the arguments?
         my $self = bless {
@@ -363,6 +363,13 @@ my $taskqueue_uuid = 'TaskQueue';
 
         unless ( _is_valid_uuid( $uuid ) ) {
             $self->throw( 'No Task uuid argument passed to unqueue_cmd.' );
+        }
+        
+        # Run the unqueue hook.
+        my $task = $self->find_task($uuid);
+        my $proc = _get_task_processor( $task );
+        if ( my $cr = $proc->can('pre_unqueue') ) {
+            eval {$cr->('Task Failed to Execute', $task) };
         }
 
         # Lock the queue before we begin accessing it.
@@ -650,6 +657,11 @@ my $taskqueue_uuid = 'TaskQueue';
         # the tests there's no way to force the right behavior.
         $self->_process_overrides( $task );
         return if $self->_is_duplicate_command( $task );
+
+        # Implement queue "hooks"
+        if ( my $cr = $proc->can('pre_queue') ) {
+            eval {$cr->($task)};
+        }
 
         push @{$self->{queue_waiting}}, $task;
 
