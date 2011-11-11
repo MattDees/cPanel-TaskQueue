@@ -369,8 +369,10 @@ my $taskqueue_uuid = 'TaskQueue';
         my $task = $self->find_task($uuid);
         my $proc = _get_task_processor( $task );
         if ( my $cr = $proc->can('pre_unqueue') ) {
-            eval {$cr->('Task Failed to Execute', $task) };
+            eval {$cr->('Task was Cancelled', $task) };
+            $self->info($@) if $@;
         }
+
 
         # Lock the queue before we begin accessing it.
         my $guard = $self->{disk_state}->synch();
@@ -661,6 +663,7 @@ my $taskqueue_uuid = 'TaskQueue';
         # Implement queue "hooks"
         if ( my $cr = $proc->can('pre_queue') ) {
             eval {$cr->($task)};
+            $self->info($@) if $@;
         }
 
         push @{$self->{queue_waiting}}, $task;
